@@ -1,0 +1,9 @@
+services:
+  llhuman:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      HUMAN_TIMEOUT_SECONDS: ${HUMAN_TIMEOUT_SECONDS:-900}
+      OPERATOR_TOKEN: ${OPERATOR_TOKEN:-}
+      LLHUMAN_API_KEY: ${LLHUMAN_API_KEY:-}
