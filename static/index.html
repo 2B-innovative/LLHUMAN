@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>LLHUMAN Operator Console</title>
+  <style>
+    :root { font-family: Inter, system-ui, sans-serif; color-scheme: dark; }
+    body { margin: 0; background: #0b0d10; color: #f4f4f5; }
+    main { max-width: 960px; margin: 0 auto; padding: 32px 20px 64px; }
+    h1 { margin-bottom: 4px; }
+    .muted { color: #a1a1aa; }
+    .bar { display:flex; gap:12px; align-items:center; margin:24px 0; flex-wrap:wrap; }
+    input, textarea, button { font: inherit; }
+    input, textarea { background:#15181d; border:1px solid #30343b; color:#fff; border-radius:10px; padding:10px 12px; }
+    input { min-width:260px; }
+    button { border:0; border-radius:10px; padding:10px 14px; cursor:pointer; font-weight:600; }
+    .connect { background:#e4e4e7; color:#111; }
+    .send { background:#fff; color:#111; }
+    .status { padding:6px 10px; border-radius:999px; background:#20242a; }
+    .request { background:#111419; border:1px solid #2a2f36; border-radius:14px; padding:18px; margin:16px 0; }
+    .msg { margin:10px 0; padding:10px 12px; border-radius:10px; background:#181c22; white-space:pre-wrap; }
+    .role { color:#a1a1aa; text-transform:uppercase; font-size:12px; font-weight:700; margin-bottom:4px; }
+    textarea { width:100%; min-height:110px; box-sizing:border-box; margin:12px 0 8px; resize:vertical; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>LLHUMAN</h1>
+  <div class="muted">Operator console for carbon-based inference.</div>
+
+  <div class="bar">
+    <input id="token" type="password" placeholder="Operator token (optional)" />
+    <button class="connect" id="connect">Connect human</button>
+    <span class="status" id="status">offline</span>
+  </div>
+
+  <div id="queue"></div>
+</main>
+<script>
+const queue = document.getElementById('queue');
+const status = document.getElementById('status');
+let socket;
+
+function renderRequest(data) {
+  if (document.getElementById(data.request_id)) return;
+  const card = document.createElement('section');
+  card.className = 'request';
+  card.id = data.request_id;
+  const heading = document.createElement('strong');
+  heading.textContent = `${data.model} · ${data.request_id}`;
+  card.appendChild(heading);
+
+  for (const msg of data.messages || []) {
+    const box = document.createElement('div');
+    box.className = 'msg';
+    const role = document.createElement('div');
+    role.className = 'role';
+    role.textContent = msg.role;
+    const content = document.createElement('div');
+    content.textContent = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content, null, 2);
+    box.append(role, content);
+    card.appendChild(box);
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.placeholder = 'Generate next token(s) using biological neural network…';
+  const send = document.createElement('button');
+  send.className = 'send';
+  send.textContent = 'Return completion';
+  send.onclick = () => {
+    const content = textarea.value.trim();
+    if (!content || !socket || socket.readyState !== WebSocket.OPEN) return;
+    socket.send(JSON.stringify({request_id: data.request_id, content}));
+    send.disabled = true;
+    send.textContent = 'Submitted';
+  };
+  card.append(textarea, send);
+  queue.prepend(card);
+  textarea.focus();
+}
+
+document.getElementById('connect').onclick = () => {
+  if (socket) socket.close();
+  const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+  const token = encodeURIComponent(document.getElementById('token').value);
+  socket = new WebSocket(`${protocol}://${location.host}/ws/operator?token=${token}`);
+  status.textContent = 'connecting';
+  socket.onopen = () => status.textContent = 'online';
+  socket.onclose = () => status.textContent = 'offline';
+  socket.onerror = () => status.textContent = 'error';
+  socket.onmessage = event => {
+    const data = JSON.parse(event.data);
+    if (data.type === 'request') renderRequest(data);
+  };
+};
+</script>
+</body>
+</html>
